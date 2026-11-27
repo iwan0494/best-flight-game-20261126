@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Langit Nusantara — Island Courier</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0b1c26;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif; color: #eaf6f2; }
+  #game-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  .panel { background: rgba(8, 28, 38, 0.72); border: 1px solid rgba(120, 220, 200, 0.35);
+    border-radius: 10px; backdrop-filter: blur(2px);
+    box-shadow: 0 0 18px rgba(20, 200, 180, 0.15), inset 0 0 24px rgba(20, 200, 180, 0.06); }
+  .label { font-size: 10px; letter-spacing: 2px; color: #7fd8c8; text-transform: uppercase; }
+  .value { font-size: 30px; font-weight: 700; color: #ffe9a8; text-shadow: 0 0 12px rgba(255, 190, 80, 0.55);
+    font-variant-numeric: tabular-nums; line-height: 1.05; }
+  .unit { font-size: 11px; color: #9fd8cb; }
+
+  #hud-top-left { position: fixed; top: 14px; left: 14px; display: flex; gap: 10px; z-index: 5; }
+  #hud-top-left .cell { padding: 8px 14px 9px; text-align: center; min-width: 96px; }
+  #hud-top-left .cell .sub { font-size: 11px; color: #9fd8cb; margin-top: 2px; }
+
+  #hud-top-center { position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+    text-align: center; padding: 8px 18px 10px; z-index: 5; max-width: 520px; }
+  #objective-name { font-size: 15px; font-weight: 700; color: #ffe9a8; letter-spacing: 0.5px; }
+  #objective-text { font-size: 12.5px; color: #d7efe8; margin-top: 2px; }
+  #objective-time { font-size: 13px; font-weight: 700; color: #ff9f1c; margin-top: 2px; }
+  #compass-tape { position: relative; height: 22px; margin-top: 6px; overflow: hidden;
+    border-top: 1px solid rgba(127, 216, 200, 0.4); }
+  #compass-tape .tick { position: absolute; top: 3px; transform: translateX(-50%);
+    font-size: 11px; color: #9fd8cb; }
+  #compass-tape .tick.major { color: #ffe9a8; font-weight: 700; font-size: 12px; }
+  #compass-tape::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0;
+    width: 2px; background: #ff7a1a; transform: translateX(-50%); }
+
+  #hud-top-right { position: fixed; top: 14px; right: 14px; text-align: right; padding: 8px 14px 9px; z-index: 5; }
+  #hud-top-right .row { font-size: 13px; margin-top: 3px; }
+  #hud-top-right .row b { color: #ffe9a8; font-size: 16px; }
+
+  #instruments { position: fixed; left: 14px; bottom: 14px; display: flex; gap: 10px;
+    align-items: flex-end; z-index: 5; }
+  #horizon-wrap { padding: 8px; text-align: center; }
+  #horizon { display: block; border-radius: 50%; background: #0b1c26; }
+  #instruments .readouts { padding: 10px 12px; font-size: 13px; line-height: 1.7; }
+  #instruments .readouts b { color: #ffe9a8; }
+
+  #gauges { position: fixed; right: 14px; bottom: 14px; display: flex; gap: 10px; z-index: 5; }
+  .gauge { width: 54px; padding: 8px 6px 6px; text-align: center; }
+  .gauge .bar { height: 110px; width: 16px; margin: 6px auto 4px; background: rgba(255,255,255,0.12);
+    border-radius: 8px; position: relative; overflow: hidden; }
+  .gauge .fill { position: absolute; left: 0; right: 0; bottom: 0; background: linear-gradient(180deg, #ffe9a8, #ff9f1c);
+    box-shadow: 0 0 10px rgba(255, 159, 28, 0.7); }
+  .gauge .fill.low { background: linear-gradient(180deg, #ff6b5e, #d23c2e); box-shadow: 0 0 10px rgba(255, 60, 40, 0.8); }
+  .gauge .gval { font-size: 12px; font-weight: 700; color: #ffe9a8; }
+
+  #banner { position: fixed; top: 22%; left: 50%; transform: translate(-50%, -12px); text-align: center;
+    padding: 14px 34px; z-index: 6; opacity: 0; pointer-events: none; transition: opacity 0.35s, transform 0.35s; }
+  #banner.show { opacity: 1; transform: translate(-50%, 0); }
+  #banner-title { font-size: 26px; font-weight: 800; color: #ffe9a8; text-shadow: 0 0 16px rgba(255, 190, 80, 0.6); }
+  #banner-sub { font-size: 14px; color: #d7efe8; margin-top: 4px; }
+  #message { position: fixed; top: 34%; left: 50%; transform: translateX(-50%); font-size: 20px; font-weight: 700;
+    color: #7dffce; text-shadow: 0 2px 10px rgba(0,0,0,0.7); z-index: 6; opacity: 0; transition: opacity 0.3s; }
+  #message.show { opacity: 1; }
+  .warn { position: fixed; top: 118px; left: 50%; transform: translateX(-50%); z-index: 6; display: none;
+    font-size: 17px; font-weight: 800; letter-spacing: 2px; color: #ff5b4d;
+    text-shadow: 0 0 14px rgba(255, 60, 40, 0.8); animation: blink 0.7s steps(2) infinite; }
+  #warn-fuel { top: 146px; }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  #hint { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 4;
+    font-size: 11.5px; color: #eaf6f2; text-shadow: 0 1px 4px rgba(0,0,0,0.8); white-space: nowrap;
+    background: rgba(8, 28, 38, 0.72); border: 1px solid rgba(120, 220, 200, 0.35);
+    border-radius: 8px; padding: 5px 12px; }
+
+  .overlay { position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, rgba(6, 24, 34, 0.55), rgba(6, 24, 34, 0.88)); }
+  .overlay.show { display: flex; }
+  .card { text-align: center; max-width: 640px; padding: 34px 44px; }
+  .card h1 { font-size: 44px; letter-spacing: 1px; color: #ffe9a8; text-shadow: 0 0 24px rgba(255, 190, 80, 0.5); }
+  .card h2 { font-size: 15px; letter-spacing: 4px; color: #7fd8c8; text-transform: uppercase; margin-top: 4px; }
+  .card p { font-size: 14.5px; line-height: 1.65; color: #d7efe8; margin-top: 14px; }
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 22px; text-align: left;
+    font-size: 13px; margin: 18px auto 4px; max-width: 520px; }
+  .controls b { color: #ffe9a8; display: inline-block; min-width: 118px; }
+  .big-btn { margin-top: 22px; font-size: 18px; font-weight: 800; letter-spacing: 1px; color: #08241f;
+    background: linear-gradient(180deg, #ffe9a8, #ff9f1c); border: none; border-radius: 10px;
+    padding: 13px 34px; cursor: pointer; box-shadow: 0 0 24px rgba(255, 159, 28, 0.55); }
+  .big-btn:hover { filter: brightness(1.08); }
+  #gameover-title { font-size: 38px; }
+  #gameover-lines { font-size: 15px; line-height: 1.8; color: #d7efe8; margin-top: 10px; }
+</style>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+
+<div id="hud-top-left">
+  <div class="cell panel"><div class="label">Altitude</div><div class="value"><span id="hud-alt">0000</span></div><div class="sub"><span id="hud-agl">0 m AGL</span></div></div>
+  <div class="cell panel"><div class="label">Speed</div><div class="value"><span id="hud-spd">0</span></div><div class="sub"><span class="unit">knots</span></div></div>
+  <div class="cell panel"><div class="label">Heading</div><div class="value"><span id="hud-hdg">035</span>°</div><div class="sub"><span class="unit">compass</span></div></div>
+</div>
+
+<div id="hud-top-center" class="panel">
+  <div id="objective-name">Misi 1 — Latihan Ring</div>
+  <div id="objective-text">Lewati 5 ring menuju Pulau A.</div>
+  <div id="objective-time"></div>
+  <div id="compass-tape"></div>
+</div>
+
+<div id="hud-top-right" class="panel">
+  <div class="row">SKOR <b id="hud-score">0</b></div>
+  <div class="row">VIEW <b id="hud-view">CHASE</b></div>
+  <div class="row">THR <b id="hud-thr">0%</b></div>
+</div>
+
+<div id="instruments">
+  <div id="horizon-wrap" class="panel">
+    <div class="label">Attitude</div>
+    <canvas id="horizon" width="150" height="150"></canvas>
+    <div style="font-size:12px; margin-top:4px;">PITCH <b id="hud-pitch" style="color:#ffe9a8">+0°</b> &nbsp; BANK <b id="hud-bank" style="color:#ffe9a8">L 0°</b></div>
+  </div>
+</div>
+
+<div id="gauges">
+  <div class="gauge panel"><div class="label">Throttle</div><div class="bar"><div id="thr-fill" class="fill" style="height:0%"></div></div><div class="gval" id="thr-val">0%</div></div>
+  <div class="gauge panel"><div class="label" id="fuel-label">Fuel</div><div class="bar"><div id="fuel-fill" class="fill" style="height:100%"></div></div><div class="gval" id="hud-fuel">100%</div></div>
+</div>
+
+<div id="banner" class="panel"><div id="banner-title"></div><div id="banner-sub"></div></div>
+<div id="message"></div>
+<div id="warn-stall" class="warn">⚠ STALL — TAMBAH THROTTLE</div>
+<div id="warn-fuel" class="warn">⚠ FUEL LOW</div>
+<div id="hint">W/S throttle &nbsp;·&nbsp; ← → belok &nbsp;·&nbsp; ↑ ↓ pitch &nbsp;·&nbsp; A/D rudder &nbsp;·&nbsp; drag mouse untuk steer &nbsp;·&nbsp; Space rem &nbsp;·&nbsp; C kamera &nbsp;·&nbsp; P jeda &nbsp;·&nbsp; R ulang &nbsp;·&nbsp; M suara</div>
+
+<div id="start-screen" class="overlay">
+  <div class="card panel">
+    <h1>LANGIT NUSANTARA</h1>
+    <h2>Island Courier</h2>
+    <p>Pesawat kargo kecil <b style="color:#ffe9a8">Cendrawasih LNU</b> mengantar paket antar pulau di kepulauan tropis.
+    Lewati ring penanda, hemat bahan bakar, dan mendarat halus di runway Pulau A — tiga kontrak menanti, dari latihan ring sampai badai senja.</p>
+    <div class="controls">
+      <div><b>W / S</b> throttle naik / turun</div><div><b>↑ / ↓</b> pitch naik / turun</div>
+      <div><b>← / →</b> belok (bank)</div><div><b>A / D</b> rudder</div>
+      <div><b>Drag mouse</b> steer halus</div><div><b>Space</b> rem udara</div>
+      <div><b>C</b> chase / cockpit</div><div><b>P</b> jeda &nbsp; <b>R</b> ulang &nbsp; <b>M</b> suara</div>
+    </div>
+    <button id="start-button" class="big-btn">✈ &nbsp;MULAI TERBANG</button>
+    <p style="font-size:12px; opacity:0.75">Lepas landas: tahan W sampai 34 knot, lalu tekan ↑ untuk rotate.</p>
+  </div>
+</div>
+
+<div id="pause-screen" class="overlay">
+  <div class="card panel">
+    <h1 style="font-size:32px">JEDA</h1>
+    <p>Penerbangan ditahan. Tekan P atau tombol di bawah untuk lanjut.</p>
+    <button id="resume-button" class="big-btn">LANJUT TERBANG</button>
+  </div>
+</div>
+
+<div id="gameover-screen" class="overlay">
+  <div class="card panel">
+    <h1 id="gameover-title">PESAWAT JATUH</h1>
+    <div id="gameover-lines"></div>
+    <button id="retry-button" class="big-btn">↻ &nbsp;TERBANG LAGI</button>
+  </div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="src/config.js"></script>
+<script src="src/terrain.js"></script>
+<script src="src/plane.js"></script>
+<script src="src/physics.js"></script>
+<script src="src/input.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/hud.js"></script>
+<script src="src/missions.js"></script>
+<script src="src/shots.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
